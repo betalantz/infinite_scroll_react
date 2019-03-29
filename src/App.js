@@ -26,14 +26,12 @@ class App extends Component {
         this.refs.myscroll.scrollHeight && !this.state.isLoading
       ) {
         this.loadPhotosBottom();
-        console.log('loadPhotos() called from event listener in componentDidMount()');
       }
       if (
         !this.refs.myscroll.scrollTop && this.refs.myscroll.clientHeight <
         this.refs.myscroll.scrollHeight && !this.state.isLoading
       ) {
         this.loadPhotosTop();
-        console.log('hitting top of scroll');
       }
     });
   }
@@ -55,8 +53,6 @@ class App extends Component {
           if (currPhotos.length >= 80) {
             currPhotos.splice(0, 20)
             this.setState({ startPage: this.state.startPage + 1 })
-            console.log('front photos removed; photos.length:', this.state.photos.length);
-            console.log('startPage renumbered: ', this.state.startPage);
           }
           // Merges the next photos into our existing photos
           this.setState({
@@ -68,7 +64,6 @@ class App extends Component {
               ...nextPhotos,
             ],
           });
-          console.log('Current end page number set when promise resolved from API call:', this.state.endPage);
         })
         .catch((err) => {
           this.setState({
@@ -112,7 +107,6 @@ class App extends Component {
               ...currPhotos,
             ],
           });
-          console.log('Current start page number set when promise resolved from API call:', this.state.startPage);
         })
         .catch((err) => {
           this.setState({
@@ -124,7 +118,6 @@ class App extends Component {
   }
 
   render() {
-    console.log("re-render");
     const {
       error,
       hasMore,
