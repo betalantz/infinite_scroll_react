@@ -9,12 +9,13 @@ class App extends Component {
       error: false,
       hasMore: true,
       isLoading: false,
-      page: 1,
+      startPage: 1,
+      endPage: 1,
       photos: []
     };
   }
   componentWillMount() {
-    this.loadUsers()
+    this.loadPhotosBottom()
   }
 
   componentDidMount() {
@@ -24,17 +25,24 @@ class App extends Component {
         this.refs.myscroll.scrollTop + this.refs.myscroll.clientHeight >=
         this.refs.myscroll.scrollHeight && !this.state.isLoading
       ) {
-        this.loadUsers();
-        console.log('loadUsers() called from event listener in componentDidMount()');
+        this.loadPhotosBottom();
+        console.log('loadPhotos() called from event listener in componentDidMount()');
+      }
+      if (
+        !this.refs.myscroll.scrollTop && this.refs.myscroll.clientHeight <
+        this.refs.myscroll.scrollHeight && !this.state.isLoading
+      ) {
+        this.loadPhotosTop();
+        console.log('hitting top of scroll');
       }
     });
   }
 
-  loadUsers() {
+  loadPhotosBottom() {
     const encodedToken = btoa(unescape(encodeURIComponent('4iPxzSjRbGsHBVWMm8nq5KG_ooiYlxvkvfkm:')))
     this.setState({ isLoading: true }, () => {
       request
-        .get(`https://gorest.co.in/public-api/photos?page=${this.state.page}`)
+        .get(`https://gorest.co.in/public-api/photos?page=${this.state.endPage}`)
         .set('Authorization', 'Basic ' + encodedToken)
         .then((results) => {
           // Creates a massaged array of photo data
@@ -43,18 +51,68 @@ class App extends Component {
             title: photo.title,
             url: photo.url,
           }));
-
+          let currPhotos = this.state.photos
+          if (currPhotos.length >= 80) {
+            currPhotos.splice(0, 20)
+            this.setState({ startPage: this.state.startPage + 1 })
+            console.log('front photos removed; photos.length:', this.state.photos.length);
+            console.log('startPage renumbered: ', this.state.startPage);
+          }
           // Merges the next photos into our existing photos
           this.setState({
             hasMore: (this.state.photos.length < 100),
             isLoading: false,
-            page: this.state.page + 1,
+            endPage: this.state.endPage + 1,
             photos: [
-              ...this.state.photos,
+              ...currPhotos,
               ...nextPhotos,
             ],
           });
-          console.log('Current page number set when promise resolved from API call:', this.state.page);
+          console.log('Current end page number set when promise resolved from API call:', this.state.endPage);
+        })
+        .catch((err) => {
+          this.setState({
+            error: err.message,
+            isLoading: false,
+            });
+        })
+    });
+  }
+
+  /* TODO: This implementation is not very DRY 
+  need to refactor, perhaps by breaking out helper functions
+  there may be too many re-renders triggered by state changes; try to optimize load times*/
+  loadPhotosTop() {
+    const encodedToken = btoa(unescape(encodeURIComponent('4iPxzSjRbGsHBVWMm8nq5KG_ooiYlxvkvfkm:')))
+    const prevPage = this.state.startPage - 1
+    this.setState({ isLoading: true }, () => {
+      request
+        .get(`https://gorest.co.in/public-api/photos?page=${prevPage}`)
+        .set('Authorization', 'Basic ' + encodedToken)
+        .then((results) => {
+          // Creates a massaged array of photo data
+          const nextPhotos = results.body.result.map(photo => ({
+            id: photo.id,
+            title: photo.title,
+            url: photo.url,
+          }));
+          let currPhotos = this.state.photos
+          if (currPhotos.length >= 80) {
+            currPhotos.splice(60)
+            this.setState({ endPage: this.endPage - 1 })
+            console.log('end photos removed; photos.length:', this.state.photos.length);
+          }
+          // Merges the next photos into our existing photos
+          this.setState({
+            hasMore: (this.state.photos.length < 100),
+            isLoading: false,
+            startPage: this.state.startPage - 1,
+            photos: [
+              ...nextPhotos,
+              ...currPhotos,
+            ],
+          });
+          console.log('Current start page number set when promise resolved from API call:', this.state.startPage);
         })
         .catch((err) => {
           this.setState({
