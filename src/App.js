@@ -9,13 +9,13 @@ class App extends Component {
       error: false,
       hasMore: true,
       isLoading: false,
-      startPage: 1,
+      isTop: false,
       endPage: 1,
       photos: []
     };
   }
   componentWillMount() {
-    this.loadPhotosBottom()
+    this.loadPhotos()
   }
 
   componentDidMount() {
@@ -25,44 +25,66 @@ class App extends Component {
         this.refs.myscroll.scrollTop + this.refs.myscroll.clientHeight >=
         this.refs.myscroll.scrollHeight && !this.state.isLoading
       ) {
-        this.loadPhotosBottom();
+        this.setState({ isTop: false })
+        this.loadPhotos();
       }
       if (
         !this.refs.myscroll.scrollTop && this.refs.myscroll.clientHeight <
         this.refs.myscroll.scrollHeight && !this.state.isLoading
       ) {
-        this.loadPhotosTop();
+        this.setState({ isTop: true })
+        this.loadPhotos();
       }
     });
   }
 
-  loadPhotosBottom() {
+  loadPhotos() {
+    const { isTop, endPage, photos } = this.state
     const encodedToken = btoa(unescape(encodeURIComponent('4iPxzSjRbGsHBVWMm8nq5KG_ooiYlxvkvfkm:')))
+    const loadPage = isTop ? endPage - 4 : endPage + 1
+    console.log('loadPage: ', loadPage);
     this.setState({ isLoading: true }, () => {
       request
-        .get(`https://gorest.co.in/public-api/photos?page=${this.state.endPage}`)
+        .get(`https://gorest.co.in/public-api/photos?page=${loadPage}`)
         .set('Authorization', 'Basic ' + encodedToken)
         .then((results) => {
-          // Creates a massaged array of photo data
+          // Creates a structured array of photo data
           const nextPhotos = results.body.result.map(photo => ({
             id: photo.id,
             title: photo.title,
             url: photo.url,
           }));
-          let currPhotos = this.state.photos
-          if (currPhotos.length >= 80) {
-            currPhotos.splice(0, 20)
-            this.setState({ startPage: this.state.startPage + 1 })
+          let currPhotos = photos
+          let newPhotos, newEndPage
+          if (!isTop) {
+            if (currPhotos.length >= 80) {
+              currPhotos.splice(0, 20)
+            }
+            newPhotos = [
+              ...currPhotos,
+              ...nextPhotos]
+            newEndPage = endPage + 1
+          } else if (isTop) {
+            if (currPhotos.length >= 80) {
+              currPhotos.splice(60)
+              newPhotos = [
+              ...nextPhotos,
+              ...currPhotos
+            ]
+            newEndPage = endPage - 1
+            } else {
+              newPhotos = [...currPhotos]
+              newEndPage = endPage
+            }
+            
           }
+          console.log('newEndPage: ', newEndPage);
           // Merges the next photos into our existing photos
           this.setState({
-            hasMore: (this.state.photos.length < 100),
+            hasMore: (results.body._meta.currentPage < results.body._meta.pageCount),
             isLoading: false,
-            endPage: this.state.endPage + 1,
-            photos: [
-              ...currPhotos,
-              ...nextPhotos,
-            ],
+            endPage: newEndPage,
+            photos: [...newPhotos],
           });
         })
         .catch((err) => {
@@ -73,50 +95,9 @@ class App extends Component {
         })
     });
   }
-
-  /* TODO: This implementation is not very DRY 
-  need to refactor, perhaps by breaking out helper functions
-  there may be too many re-renders triggered by state changes; try to optimize load times*/
-  loadPhotosTop() {
-    const encodedToken = btoa(unescape(encodeURIComponent('4iPxzSjRbGsHBVWMm8nq5KG_ooiYlxvkvfkm:')))
-    const prevPage = this.state.startPage - 1
-    this.setState({ isLoading: true }, () => {
-      request
-        .get(`https://gorest.co.in/public-api/photos?page=${prevPage}`)
-        .set('Authorization', 'Basic ' + encodedToken)
-        .then((results) => {
-          // Creates a massaged array of photo data
-          const nextPhotos = results.body.result.map(photo => ({
-            id: photo.id,
-            title: photo.title,
-            url: photo.url,
-          }));
-          let currPhotos = this.state.photos
-          if (currPhotos.length >= 80) {
-            currPhotos.splice(60)
-            this.setState({ endPage: this.endPage - 1 })
-            console.log('end photos removed; photos.length:', this.state.photos.length);
-          }
-          // Merges the next photos into our existing photos
-          this.setState({
-            hasMore: (this.state.photos.length < 100),
-            isLoading: false,
-            startPage: this.state.startPage - 1,
-            photos: [
-              ...nextPhotos,
-              ...currPhotos,
-            ],
-          });
-        })
-        .catch((err) => {
-          this.setState({
-            error: err.message,
-            isLoading: false,
-            });
-        })
-    });
-  }
-
+/* TODO: 
+Set App div height = window height
+make sure render times are optimized */
   render() {
     const {
       error,
@@ -161,7 +142,7 @@ class App extends Component {
           <div>Loading...</div>
         }
         {!hasMore &&
-          <div>You did it! You reached the end!</div>
+          <div>No more photos to display...</div>
         }
       </div>
     );
